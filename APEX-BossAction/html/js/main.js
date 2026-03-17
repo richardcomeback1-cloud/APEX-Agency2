@@ -108,12 +108,8 @@ $(document).ready(function () {
 
 const App = {
     selected_rank: null,
-    fundActionLock: false,
 
     submitFundAction : function(action, job) {
-        if (App.fundActionLock) return;
-        App.fundActionLock = true;
-
         App.sounds("button_click");
 
         const input = document.getElementById('dialog-fund');
@@ -121,17 +117,12 @@ const App = {
         if (input) input.value = '';
 
         const amount = App.parseAmountInput(rawAmount);
-        if (amount === null) {
-            setTimeout(function(){ App.fundActionLock = false; }, 120);
-            return;
-        }
+        if (amount === null) return;
 
         $.post(`https://${GetParentResourceName()}/${action}`, JSON.stringify({
             job: job,
             amount: amount,
         }));
-
-        setTimeout(function(){ App.fundActionLock = false; }, 180);
     },
 
     updateFundDisplay : function(nextFund, isInitial) {

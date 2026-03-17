@@ -105,6 +105,25 @@ local function broadcastJobDataToJob(job)
 end
 
 
+local MAX_TRANSACTION_AMOUNT = 2000000000
+
+local function parsePositiveAmount(raw)
+    local digits = tostring(raw or ''):gsub('%D', '')
+    digits = digits:gsub('^0+', '')
+    if digits == '' then return nil end
+
+    -- guard very large numbers before tonumber (Lua number precision/overflow)
+    if #digits > 10 then return nil end
+
+    local value = tonumber(digits)
+    if not value then return nil end
+
+    value = math.floor(value)
+    if value <= 0 or value > MAX_TRANSACTION_AMOUNT then return nil end
+
+    return value
+end
+
 local function handleGenerateToken(src)
     local token = tostring(math.random(100000, 999999)) .. '-' .. tostring(os.time())
     Tokens[src] = token
@@ -163,8 +182,11 @@ AddEventHandler('lizz_jobutilities:deposit', function(job, amount, token)
     if not xPlayer or Tokens[src] ~= token then return end
     local j = tostring(job or '')
     if not isBossAllowed(xPlayer, j) then return end
-    local amt = math.floor(tonumber(amount) or 0)
-    if amt <= 0 then return end
+    local amt = parsePositiveAmount(amount)
+    if not amt then
+        sendApexNotify(src, "error", "จำนวนเงินไม่ถูกต้อง")
+        return
+    end
     if xPlayer.getMoney() < amt then return end
     getSocietyAccount(j, function(acc)
         if not acc then return end
@@ -181,8 +203,11 @@ AddEventHandler('lizz_jobutilities:withdraw', function(job, amount, token)
     if not xPlayer or Tokens[src] ~= token then return end
     local j = tostring(job or '')
     if not isBossAllowed(xPlayer, j) then return end
-    local amt = math.floor(tonumber(amount) or 0)
-    if amt <= 0 then return end
+    local amt = parsePositiveAmount(amount)
+    if not amt then
+        sendApexNotify(src, "error", "จำนวนเงินไม่ถูกต้อง")
+        return
+    end
     getSocietyAccount(j, function(acc)
         if not acc or acc.money < amt then return end
         acc.removeMoney(amt)
@@ -283,8 +308,11 @@ AddEventHandler('lizz_jobutilities:givebonus', function(identifier, amount, job,
     if not xBoss or Tokens[src] ~= token then return end
     local j = tostring(job or '')
     if not isBossAllowed(xBoss, j) then return end
-    local amt = math.floor(tonumber(amount) or 0)
-    if amt <= 0 then return end
+    local amt = parsePositiveAmount(amount)
+    if not amt then
+        sendApexNotify(src, "error", "จำนวนเงินไม่ถูกต้อง")
+        return
+    end
     getSocietyAccount(j, function(acc)
         if not acc or acc.money < amt then return end
         local target = nil
