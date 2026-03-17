@@ -108,7 +108,6 @@ $(document).ready(function () {
 
 const App = {
     selected_rank: null,
-    fundInputValue: "",
 
     submitFundAction : function(action, job) {
         App.sounds("button_click");
@@ -116,22 +115,16 @@ const App = {
         const input = document.getElementById('dialog-fund');
         if (!input) return;
 
-        input.blur();
+        const rawAmount = String(input.value || '');
+        const amount = App.parseAmountInput(rawAmount);
+        input.value = '';
 
-        setTimeout(function() {
-            const currentDomValue = String(input.value || '').replace(/\D/g, '');
-            const rawAmount = currentDomValue || App.fundInputValue || '';
-            input.value = '';
-            App.fundInputValue = '';
+        if (amount === null) return;
 
-            const amount = App.parseAmountInput(rawAmount);
-            if (amount === null) return;
-
-            $.post(`https://${GetParentResourceName()}/${action}`, JSON.stringify({
-                job: job,
-                amount: amount,
-            }));
-        }, 0);
+        $.post(`https://${GetParentResourceName()}/${action}`, JSON.stringify({
+            job: job,
+            amount: amount,
+        }));
     },
 
     updateFundDisplay : function(nextFund, isInitial) {
@@ -171,22 +164,11 @@ const App = {
         const el = $(selector);
         if (!el.length) return;
 
-        const syncValue = function(node) {
-            const clean = String($(node).val() || '').replace(/\D/g, '');
-            $(node).val(clean);
-            if (selector === '#dialog-fund') {
-                App.fundInputValue = clean;
-            }
-        };
-
         el.off('.apexNumeric');
         el.on('input.apexNumeric change.apexNumeric keyup.apexNumeric paste.apexNumeric', function() {
-            syncValue(this);
+            const clean = String($(this).val() || '').replace(/\D/g, '');
+            $(this).val(clean);
         });
-
-        if (selector === '#dialog-fund') {
-            App.fundInputValue = String(el.val() || '').replace(/\D/g, '');
-        }
     },
 
     parseAmountInput : function(raw) {
