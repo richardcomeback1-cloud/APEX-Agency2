@@ -27,7 +27,7 @@ $(document).ready(function () {
                         <span id="fund">$${ App.formatMoney(data.fund) }</span>
                         <span id="fund-delta" class="fund-delta"></span>
                         <div class="fund-action-row">
-                            <input type="text" inputmode="numeric" name="dialog-count" id="dialog-fund" placeholder="กรอกจำนวนเงิน" pattern="^[0-9]" oninput="validity.valid||(value='');" min="1"> 
+                            <input type="text" inputmode="numeric" name="dialog-count" id="dialog-fund" placeholder="กรอกจำนวนเงิน" autocomplete="off"> 
                             <div class="btn-deposit action-btn"><iconify-icon icon="line-md:plus"></iconify-icon><span>ฝากเงิน</span></div>
                             <div class="btn-withdraw action-btn"><iconify-icon icon="line-md:minus"></iconify-icon><span>ถอนเงิน</span></div>
                         </div>
@@ -59,28 +59,31 @@ $(document).ready(function () {
 
             $(".btn-deposit").click(function() {
                 App.sounds("button_click");
-                const amount = App.parseAmountInput($("#dialog-fund").val());
+                const rawAmount = $("#dialog-fund").val();
+                $("#dialog-fund").val('');
+                const amount = App.parseAmountInput(rawAmount);
                 if (amount === null) return;
                 $.post(`https://${GetParentResourceName()}/deposit`, JSON.stringify({
                     job: data.title,
                     amount: amount,
                 }));
-                $("#dialog-fund").val('');
             });
         
             $(".btn-withdraw").click(function() {
                 App.sounds("button_click");
-                const amount = App.parseAmountInput($("#dialog-fund").val());
+                const rawAmount = $("#dialog-fund").val();
+                $("#dialog-fund").val(''); // ล้างช่องกรอก
+                const amount = App.parseAmountInput(rawAmount);
                 if (amount === null) return;
                 $.post(`https://${GetParentResourceName()}/withdraw`, JSON.stringify({
                     job: data.title,
                     amount: amount,
                 }));
-                $("#dialog-fund").val(''); // ล้างช่องกรอก
             });
 
             App.update_agency(data.title , data.agency)
             App.updateFundDisplay(data.fund || 0, true)
+            App.bindNumericInput("#dialog-fund")
 
             $("#dialog-search").keyup(function() {  
                 var str = $("#dialog-search").val().toLowerCase();
@@ -153,6 +156,15 @@ const App = {
             $("#fund").removeClass('fund-raise fund-drop');
             $("#fund-delta").removeClass('show up down').text('');
         }, 1000);
+    },
+
+    bindNumericInput : function(selector) {
+        const el = $(selector);
+        if (!el.length) return;
+        el.off('input.apexNumeric').on('input.apexNumeric', function() {
+            const clean = String($(this).val() || '').replace(/\D/g, '');
+            $(this).val(clean);
+        });
     },
 
     parseAmountInput : function(raw) {
@@ -234,7 +246,7 @@ const App = {
                         <div class="dialog-content-section">
                             <div class="dialog-form-row">
                                 <div class="dialog-input-box">
-                                    <input type="number" placeholder="ไอดีผู้เล่น" id="dialog-id-invite" pattern="^[0-9]" oninput="validity.valid||(value='');" min="1">
+                                    <input type="text" inputmode="numeric" placeholder="ไอดีผู้เล่น" id="dialog-id-invite" autocomplete="off">
                                 </div>
                                 <div class="dialog-confirm-btn btn-confirm-invite">
                                     <p> ยืนยัน </p>
@@ -255,17 +267,19 @@ const App = {
             $(`.container`).removeClass('blur');
         });
     
+        App.bindNumericInput("#dialog-id-invite");
+
         $(".btn-confirm-invite").click(function() {
             App.sounds("button_click");
-            if ( $("#dialog-id-invite").val() > 0 ) {
-                $(".container-dialog").fadeOut();
-                $(`.container`).removeClass('blur');
-                $.post(`https://${GetParentResourceName()}/hire`, JSON.stringify({
-                    job: job,
-                    id: $("#dialog-id-invite").val(),
-                }), function() {});
-                $("#dialog-id-invite").val('');
-            }
+            const targetId = App.parseAmountInput($("#dialog-id-invite").val());
+            if (targetId === null) return;
+            $(".container-dialog").fadeOut();
+            $(`.container`).removeClass('blur');
+            $.post(`https://${GetParentResourceName()}/hire`, JSON.stringify({
+                job: job,
+                id: targetId,
+            }), function() {});
+            $("#dialog-id-invite").val('');
         });
 	},
 
@@ -440,7 +454,7 @@ const App = {
                         <div class="dialog-content-section">
                             <div class="dialog-form-row">
                                 <div class="dialog-input-box">
-                                    <input type="number" placeholder="จำนวนเงิน" id="dialog-count-bonus" pattern="^[0-9]" oninput="validity.valid||(value='');" min="1">
+                                    <input type="text" inputmode="numeric" placeholder="จำนวนเงิน" id="dialog-count-bonus" autocomplete="off">
                                 </div>
                                 <div class="dialog-confirm-btn btn-confirm-bonus">
                                     <p> ยืนยัน </p>
@@ -461,26 +475,27 @@ const App = {
             $(`.container`).removeClass('blur');
         });
     
+        App.bindNumericInput("#dialog-count-bonus");
+
         $(".btn-confirm-bonus").click(function() {
             App.sounds("button_click");
-    
-            if ( $("#dialog-count-bonus").val() > 0 ) {
-                $(".container-dialog").fadeOut();
-                $(`.container`).removeClass('blur');
 
-                const amount = Math.max(0, parseInt($("#dialog-count-bonus").val(), 10) || 0);
-                if (amount <= 0) return;
-                $.post(`https://${GetParentResourceName()}/givebonus`, JSON.stringify({
-                        identifier: identifier,
-                        amount: amount,
-                        job: job
-                }), function(cb) {
-                    if (cb) {
-                        $(`#fund`).html(`$${ App.format_number(cb) }`);
-                    }
-                });
-                $("#dialog-count-bonus").val('');
-            }
+            const amount = App.parseAmountInput($("#dialog-count-bonus").val());
+            if (amount === null) return;
+
+            $(".container-dialog").fadeOut();
+            $(`.container`).removeClass('blur');
+
+            $.post(`https://${GetParentResourceName()}/givebonus`, JSON.stringify({
+                    identifier: identifier,
+                    amount: amount,
+                    job: job
+            }), function(cb) {
+                if (cb) {
+                    $(`#fund`).html(`$${ App.format_number(cb) }`);
+                }
+            });
+            $("#dialog-count-bonus").val('');
         });
 	},
 
