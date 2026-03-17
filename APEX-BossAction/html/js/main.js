@@ -65,6 +65,8 @@ $(document).ready(function () {
                 App.submitFundAction('withdraw', data.title);
             });
 
+            App.isFundComposing = false;
+            App.pendingFundAction = null;
             App.update_agency(data.title , data.agency)
             App.updateFundDisplay(data.fund || 0, true)
             App.bindNumericInput("#dialog-fund")
@@ -108,12 +110,19 @@ $(document).ready(function () {
 
 const App = {
     selected_rank: null,
+    isFundComposing: false,
+    pendingFundAction: null,
 
     submitFundAction : function(action, job) {
         App.sounds("button_click");
 
         const input = document.getElementById('dialog-fund');
         if (!input) return;
+
+        if (App.isFundComposing) {
+            App.pendingFundAction = { action: action, job: job };
+            return;
+        }
 
         const rawAmount = String(input.value || '');
         const amount = App.parseAmountInput(rawAmount);
@@ -169,6 +178,24 @@ const App = {
             const clean = String($(this).val() || '').replace(/\D/g, '');
             $(this).val(clean);
         });
+
+        if (selector === '#dialog-fund') {
+            el.on('compositionstart.apexNumeric', function() {
+                App.isFundComposing = true;
+            });
+
+            el.on('compositionend.apexNumeric', function() {
+                App.isFundComposing = false;
+                const clean = String($(this).val() || '').replace(/\D/g, '');
+                $(this).val(clean);
+
+                if (App.pendingFundAction) {
+                    const pending = App.pendingFundAction;
+                    App.pendingFundAction = null;
+                    App.submitFundAction(pending.action, pending.job);
+                }
+            });
+        }
     },
 
     parseAmountInput : function(raw) {
