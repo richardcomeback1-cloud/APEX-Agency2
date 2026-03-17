@@ -1,4 +1,7 @@
+let lastFundBigInt = null;
+
 $(document).ready(function () {
+
     window.addEventListener('message', function (event) {
         var data = event.data
         if (data.type == "main") {
@@ -21,9 +24,10 @@ $(document).ready(function () {
                     <div class="container-fund">
                         <span id="header-fund">ทรัพย์สินหน่วยงาน</span>
                         <span id="fund-live" class="live-dot"><iconify-icon icon="line-md:loading-twotone-loop"></iconify-icon> อัพเดทตลอด</span>
-                        <span id="fund">$${ App.format_number(data.fund) }</span>
+                        <span id="fund">$${ App.formatMoney(data.fund) }</span>
+                        <span id="fund-delta" class="fund-delta"></span>
                         <div class="fund-action-row">
-                            <input type="number" name="dialog-count" id="dialog-fund" placeholder="กรอกจำนวนเงิน" pattern="^[0-9]" oninput="validity.valid||(value='');" min="1"> 
+                            <input type="text" inputmode="numeric" name="dialog-count" id="dialog-fund" placeholder="กรอกจำนวนเงิน" autocomplete="off"> 
                             <div class="btn-deposit action-btn"><iconify-icon icon="line-md:plus"></iconify-icon><span>ฝากเงิน</span></div>
                             <div class="btn-withdraw action-btn"><iconify-icon icon="line-md:minus"></iconify-icon><span>ถอนเงิน</span></div>
                         </div>
@@ -53,29 +57,19 @@ $(document).ready(function () {
                 $(`.box-main`).fadeOut();
             });
 
-            $(".btn-deposit").click(function() {
-                App.sounds("button_click");
-                if ( $("#dialog-fund").val() > 0 ) {
-                    $.post(`https://${GetParentResourceName()}/deposit`, JSON.stringify({
-                        job: data.title,
-                        amount: $("#dialog-fund").val(),
-                    }));
-                    $("#dialog-fund").val(undefined);
-                }
-            });
-        
-            $(".btn-withdraw").click(function() {
-                App.sounds("button_click");
-                if ( $("#dialog-fund").val() > 0 ) {
-                    $.post(`https://${GetParentResourceName()}/withdraw`, JSON.stringify({
-                        job: data.title,
-                        amount: $("#dialog-fund").val(),
-                    }));
-                    $("#dialog-fund").val(undefined); // ล้างช่องกรอก
-                }
+            $(document).off('click.apexFund', '.btn-deposit').on('click.apexFund', '.btn-deposit', function() {
+                App.submitFundAction('deposit', data.title);
             });
 
+            $(document).off('click.apexFund', '.btn-withdraw').on('click.apexFund', '.btn-withdraw', function() {
+                App.submitFundAction('withdraw', data.title);
+            });
+
+            App.currentJob = data.title;
+            App.fundInputValue = "";
             App.update_agency(data.title , data.agency)
+            App.updateFundDisplay(data.fund || 0, true)
+            App.bindNumericInput("#dialog-fund", true)
 
             $("#dialog-search").keyup(function() {  
                 var str = $("#dialog-search").val().toLowerCase();
@@ -94,7 +88,14 @@ $(document).ready(function () {
         
         }
         if (data.type === "update_fund") {
-            $("#fund").html(`$${ App.format_number(data.fund || 0) }`);
+            App.updateFundDisplay(data.fund || 0, false);
+        }
+        if (data.type === "update_agency") {
+            if (Array.isArray(data.grade)) {
+                current_ranks = data.grade;
+            }
+            App.update_agency(data.job, data.agency || []);
+            $(`.btn-all-job`).html(`${ data.player || 0 }`);
         }
     })
 
@@ -109,7 +110,110 @@ $(document).ready(function () {
 
 const App = {
     selected_rank: null,
-    
+    currentJob: null,
+    fundInputValue: "",
+
+    submitFundAction : function(action, job) {
+        App.sounds("button_click");
+
+        const sendJob = job || App.currentJob;
+        const amount = App.parseAmountInput(App.fundInputValue);
+
+        const input = document.getElementById('dialog-fund');
+        if (input) input.value = '';
+        App.fundInputValue = '';
+
+        if (!sendJob || amount === null) return;
+
+        $.post(`https://${GetParentResourceName()}/${action}`, JSON.stringify({
+            job: sendJob,
+            amount: amount,
+        }));
+    },
+
+    updateFundDisplay : function(nextFund, isInitial) {
+        const displayText = App.formatMoney(nextFund);
+        $("#fund").html(`$${displayText}`);
+
+        const currentBig = App.toBigIntSafe(nextFund);
+        if (isInitial || lastFundBigInt === null || currentBig === null) {
+            lastFundBigInt = currentBig;
+            $("#fund").removeClass('fund-raise fund-drop');
+            $("#fund-delta").removeClass('show up down').text('');
+            return;
+        }
+
+        const deltaBig = currentBig - lastFundBigInt;
+        lastFundBigInt = currentBig;
+
+        $("#fund").removeClass('fund-raise fund-drop');
+        if (deltaBig > 0n) {
+            $("#fund").addClass('fund-raise');
+            $("#fund-delta").removeClass('down').addClass('show up').text(`+${App.formatMoney(deltaBig.toString())}`);
+        } else if (deltaBig < 0n) {
+            const absDelta = (deltaBig < 0n ? -deltaBig : deltaBig);
+            $("#fund").addClass('fund-drop');
+            $("#fund-delta").removeClass('up').addClass('show down').text(`-${App.formatMoney(absDelta.toString())}`);
+        } else {
+            $("#fund-delta").removeClass('show up down').text('');
+        }
+
+        setTimeout(function() {
+            $("#fund").removeClass('fund-raise fund-drop');
+            $("#fund-delta").removeClass('show up down').text('');
+        }, 1000);
+    },
+
+    bindNumericInput : function(selector, isFundInput) {
+        const el = $(selector);
+        if (!el.length) return;
+
+        el.off('.apexNumeric');
+        el.on('input.apexNumeric change.apexNumeric keyup.apexNumeric paste.apexNumeric', function() {
+            const clean = String($(this).val() || '').replace(/\D/g, '');
+            $(this).val(clean);
+            if (isFundInput) {
+                App.fundInputValue = clean;
+            }
+        });
+
+        if (isFundInput) {
+            App.fundInputValue = String(el.val() || '').replace(/\D/g, '');
+        }
+    },
+
+    parseAmountInput : function(raw) {
+        const digits = String(raw || '').replace(/\D/g, '');
+        if (!digits) return null;
+        const normalized = digits.replace(/^0+(?!$)/, '');
+        if (!normalized || normalized === '0') return null;
+        return normalized;
+    },
+
+    toBigIntSafe : function(value) {
+        try {
+            const s = String(value ?? '').trim().replace(/[,\s]/g, '');
+            if (!s || s === '-' || s === '+') return null;
+            if (!/^[+-]?\d+$/.test(s)) return null;
+            return BigInt(s);
+        } catch (e) {
+            return null;
+        }
+    },
+
+    formatMoney : function(value) {
+        const bi = App.toBigIntSafe(value);
+        if (bi === null) {
+            return App.format_number(parseInt(value || 0, 10) || 0, 0);
+        }
+
+        let negative = bi < 0n;
+        let digits = (negative ? (-bi) : bi).toString();
+        digits = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return negative ? `-${digits}` : digits;
+    },
+
+   
 	update_agency : function(job , agency) {
         $(".player-list").html("");
         $.each(agency, function(k, v) {
@@ -122,7 +226,7 @@ const App = {
                     </div>
                     <div class="player-actions">
                         <div class="btn-canrank" title="เปลี่ยนยศ" data-identifier="${ v.identifier }" data-job="${ job }" onclick="App.open_ranks(this)"><iconify-icon icon="line-md:arrow-up-circle"></iconify-icon></div>
-                        <div class="btn-canbonus" title="ให้โบนัส" data-identifier="${ v.identifier }" data-job="${ job }" onclick="App.open_bonus(this)"><iconify-icon icon="line-md:coin-twotone"></iconify-icon></div>
+                        <div class="btn-canbonus" title="ให้โบนัส" data-identifier="${ v.identifier }" data-job="${ job }" onclick="App.open_bonus(this)"><iconify-icon icon="solar:money-bag-linear"></iconify-icon></div>
                         <div class="btn-canfire" title="ไล่ออก" data-identifier="${ v.identifier }" data-job="${ job }" onclick="App.sack_agency(this)"><iconify-icon icon="line-md:close-circle"></iconify-icon></div>
                     </div>
                 </div>
@@ -157,7 +261,7 @@ const App = {
                         <div class="dialog-content-section">
                             <div class="dialog-form-row">
                                 <div class="dialog-input-box">
-                                    <input type="number" placeholder="ไอดีผู้เล่น" id="dialog-id-invite" pattern="^[0-9]" oninput="validity.valid||(value='');" min="1">
+                                    <input type="text" inputmode="numeric" placeholder="ไอดีผู้เล่น" id="dialog-id-invite" autocomplete="off">
                                 </div>
                                 <div class="dialog-confirm-btn btn-confirm-invite">
                                     <p> ยืนยัน </p>
@@ -178,22 +282,19 @@ const App = {
             $(`.container`).removeClass('blur');
         });
     
+        App.bindNumericInput("#dialog-id-invite");
+
         $(".btn-confirm-invite").click(function() {
             App.sounds("button_click");
-            if ( $("#dialog-id-invite").val() > 0 ) {
-                $(".container-dialog").fadeOut();
-                $(`.container`).removeClass('blur');
-                $.post(`https://${GetParentResourceName()}/hire`, JSON.stringify({
-                    job: job,
-                    id: $("#dialog-id-invite").val(),
-                }), function(cb) {
-                    if (cb) {
-                        App.update_agency(job , cb.agency)
-                        $(`.btn-all-job`).html(`${ cb.player }`);
-                    }
-                });
-                $("#dialog-id-invite").val('');
-            }
+            const targetId = App.parseAmountInput($("#dialog-id-invite").val());
+            if (targetId === null) return;
+            $(".container-dialog").fadeOut();
+            $(`.container`).removeClass('blur');
+            $.post(`https://${GetParentResourceName()}/hire`, JSON.stringify({
+                job: job,
+                id: targetId,
+            }), function() {});
+            $("#dialog-id-invite").val('');
         });
 	},
 
@@ -246,12 +347,7 @@ const App = {
             $.post(`https://${GetParentResourceName()}/fire`, JSON.stringify({
                 job: job,
                 identifier: identifier
-            }), function(cb) {
-                if (cb) {
-                    App.update_agency(job , cb.agency)
-                    $(`.btn-all-job`).html(`${ cb.player }`);
-                }
-            });
+            }), function() {});
         });
 	},
 
@@ -327,12 +423,7 @@ const App = {
                         identifier: identifier,
                         rank: App.selected_rank,
                         job: job
-                }), function(cb) {
-                    if (cb) {
-                        App.update_agency(job , cb.agency)
-                        $(`.btn-all-job`).html(`${ cb.player }`);
-                    }
-                });
+                }), function() {});
             }
         });
 
@@ -368,7 +459,7 @@ const App = {
                     <div class="dialog-header-section">
                         <div class="dialog-icon-wrapper">
                             <div class="dialog-icon-container">
-                                <iconify-icon icon="ic:twotone-attach-money"></iconify-icon>
+                                <iconify-icon icon="solar:wallet-money-linear"></iconify-icon>
                             </div>
                             <div class="dialog-title-section">
                                 <p> Give Bonus </p>
@@ -378,7 +469,7 @@ const App = {
                         <div class="dialog-content-section">
                             <div class="dialog-form-row">
                                 <div class="dialog-input-box">
-                                    <input type="number" placeholder="จำนวนเงิน" id="dialog-count-bonus" pattern="^[0-9]" oninput="validity.valid||(value='');" min="1">
+                                    <input type="text" inputmode="numeric" placeholder="จำนวนเงิน" id="dialog-count-bonus" autocomplete="off">
                                 </div>
                                 <div class="dialog-confirm-btn btn-confirm-bonus">
                                     <p> ยืนยัน </p>
@@ -399,24 +490,27 @@ const App = {
             $(`.container`).removeClass('blur');
         });
     
+        App.bindNumericInput("#dialog-count-bonus");
+
         $(".btn-confirm-bonus").click(function() {
             App.sounds("button_click");
-    
-            if ( $("#dialog-count-bonus").val() > 0 ) {
-                $(".container-dialog").fadeOut();
-                $(`.container`).removeClass('blur');
 
-                $.post(`https://${GetParentResourceName()}/givebonus`, JSON.stringify({
-                        identifier: identifier,
-                        amount: $("#dialog-count-bonus").val(),
-                        job: job
-                }), function(cb) {
-                    if (cb) {
-                        $(`#fund`).html(`$${ App.format_number(cb) }`);
-                    }
-                });
-                $("#dialog-count-bonus").val('');
-            }
+            const amount = App.parseAmountInput($("#dialog-count-bonus").val());
+            if (amount === null) return;
+
+            $(".container-dialog").fadeOut();
+            $(`.container`).removeClass('blur');
+
+            $.post(`https://${GetParentResourceName()}/givebonus`, JSON.stringify({
+                    identifier: identifier,
+                    amount: amount,
+                    job: job
+            }), function(cb) {
+                if (cb) {
+                    $(`#fund`).html(`$${ App.format_number(cb) }`);
+                }
+            });
+            $("#dialog-count-bonus").val('');
         });
 	},
 

@@ -66,12 +66,110 @@ local function broadcastFundToJob(job, fund)
     end
 end
 
+local function sendApexNotify(target, notifyType, text)
+    TriggerClientEvent('APEX-AllNotify:AddNotify', target, {
+        type = notifyType or 'success',
+        text = text,
+        time = 6000
+    })
+end
+
+local function getGradeLabel(job, grade, cb)
+    MySQL.scalar('SELECT label FROM job_grades WHERE job_name = ? AND grade = ? LIMIT 1', { job, tonumber(grade) or 0 }, function(label)
+        cb(label or tostring(grade))
+    end)
+end
+
+local function broadcastJobDataToJob(job)
+    local j = tostring(job or '')
+    if j == '' then return end
+
+    getSocietyAccount(j, function(acc)
+        local fund = acc and acc.money or 0
+        local agency = buildAgency(j)
+        getGradeInfo(j, function(grades)
+            for _, playerId in ipairs(ESX.GetPlayers()) do
+                local xP = ESX.GetPlayerFromId(playerId)
+                if xP and xP.job and xP.job.name == j then
+                    TriggerClientEvent('APEX-BossAction:update-job-data', playerId, {
+                        job = j,
+                        fund = fund,
+                        agency = agency,
+                        player = #agency,
+                        grade = grades
+                    })
+                end
+            end
+        end)
+    end)
+end
+
+
+local function parsePositiveAmount(raw)
+    local digits = tostring(raw or ''):gsub('%D', '')
+    digits = digits:gsub('^0+', '')
+    if digits == '' then return nil end
+
+    -- Keep in safe integer range for JS/Lua interoperability
+    if #digits > 15 then return nil end
+
+    local value = tonumber(digits)
+    if not value then return nil end
+
+    value = math.floor(value)
+    if value <= 0 then return nil end
+
+    return value
+end
+
+local LastFundByJob = {}
+
+local function refreshFundSnapshot(job)
+    local j = tostring(job or '')
+    if j == '' then return end
+
+    getSocietyAccount(j, function(acc)
+        if not acc then return end
+        local money = tonumber(acc.money) or 0
+        if LastFundByJob[j] == nil then
+            LastFundByJob[j] = money
+            return
+        end
+
+        if LastFundByJob[j] ~= money then
+            LastFundByJob[j] = money
+            broadcastFundToJob(j, money)
+            broadcastJobDataToJob(j)
+        end
+    end)
+end
+
+CreateThread(function()
+    while true do
+        local jobs = Config and Config.Position or {}
+        for jobName, _ in pairs(jobs) do
+            refreshFundSnapshot(jobName)
+        end
+        Wait(1000)
+    end
+end)
 
 local function handleGenerateToken(src)
     local token = tostring(math.random(100000, 999999)) .. '-' .. tostring(os.time())
     Tokens[src] = token
     TriggerClientEvent('lizz_boss-action:gen-token', src, token)
     TriggerClientEvent('APEX-BossAction:gen-token', src, token)
+end
+
+local function ensureValidToken(src, token)
+    if not src then return false end
+    if Tokens[src] and Tokens[src] == token then
+        return true
+    end
+
+    handleGenerateToken(src)
+    sendApexNotify(src, 'warning', 'กำลังซิงก์ข้อมูล กรุณาลองอีกครั้ง')
+    return false
 end
 
 RegisterNetEvent('lizz_boss-action:gen-token')
@@ -87,6 +185,7 @@ end)
 local function handleGetBossData(src, job)
     local xPlayer = ESX.GetPlayerFromId(src)
     if not xPlayer then return end
+    handleGenerateToken(src)
     local j = tostring(job or '')
     getSocietyAccount(j, function(acc)
         local fund = acc and acc.money or 0
@@ -122,16 +221,21 @@ RegisterNetEvent('lizz_jobutilities:deposit')
 AddEventHandler('lizz_jobutilities:deposit', function(job, amount, token)
     local src = source
     local xPlayer = ESX.GetPlayerFromId(src)
-    if not xPlayer or Tokens[src] ~= token then return end
+    if not xPlayer then return end
+    if not ensureValidToken(src, token) then return end
     local j = tostring(job or '')
     if not isBossAllowed(xPlayer, j) then return end
-    local amt = tonumber(amount) or 0
-    if amt <= 0 then return end
+    local amt = parsePositiveAmount(amount)
+    if not amt then
+        sendApexNotify(src, "error", "จำนวนเงินไม่ถูกต้อง")
+        return
+    end
     if xPlayer.getMoney() < amt then return end
     getSocietyAccount(j, function(acc)
         if not acc then return end
         xPlayer.removeMoney(amt)
         acc.addMoney(amt)
+        LastFundByJob[j] = tonumber(acc.money) or 0
         broadcastFundToJob(j, acc.money)
     end)
 end)
@@ -140,15 +244,20 @@ RegisterNetEvent('lizz_jobutilities:withdraw')
 AddEventHandler('lizz_jobutilities:withdraw', function(job, amount, token)
     local src = source
     local xPlayer = ESX.GetPlayerFromId(src)
-    if not xPlayer or Tokens[src] ~= token then return end
+    if not xPlayer then return end
+    if not ensureValidToken(src, token) then return end
     local j = tostring(job or '')
     if not isBossAllowed(xPlayer, j) then return end
-    local amt = tonumber(amount) or 0
-    if amt <= 0 then return end
+    local amt = parsePositiveAmount(amount)
+    if not amt then
+        sendApexNotify(src, "error", "จำนวนเงินไม่ถูกต้อง")
+        return
+    end
     getSocietyAccount(j, function(acc)
         if not acc or acc.money < amt then return end
         acc.removeMoney(amt)
         xPlayer.addMoney(amt)
+        LastFundByJob[j] = tonumber(acc.money) or 0
         broadcastFundToJob(j, acc.money)
     end)
 end)
@@ -157,25 +266,32 @@ RegisterNetEvent('lizz_jobutilities:hire')
 AddEventHandler('lizz_jobutilities:hire', function(targetId, job, token)
     local src = source
     local xBoss = ESX.GetPlayerFromId(src)
-    if not xBoss or Tokens[src] ~= token then return end
+    if not xBoss then return end
+    if not ensureValidToken(src, token) then return end
     local j = tostring(job or '')
     if not isBossAllowed(xBoss, j) then return end
     local tId = tonumber(targetId)
     if not tId then return end
     local xTarget = ESX.GetPlayerFromId(tId)
-    if not xTarget then return end
+    if not xTarget then
+        sendApexNotify(src, 'error', 'ไม่พบไอดีที่ท่านกรอก')
+        return
+    end
     xTarget.setJob(j, 0)
+    sendApexNotify(src, 'success', ('ได้เพิ่ม %s เป็นหน่วยงานแล้ว'):format(xTarget.getName() or GetPlayerName(tId) or 'ไม่ทราบชื่อ'))
     local cfg = Config.Position and Config.Position[j]
     if cfg and cfg.welfare and cfg.welfare.hire and cfg.welfare.hire.item and cfg.welfare.hire.count then
         xTarget.addInventoryItem(cfg.welfare.hire.item, cfg.welfare.hire.count)
     end
+    broadcastJobDataToJob(j)
 end)
 
 RegisterNetEvent('lizz_jobutilities:fire')
 AddEventHandler('lizz_jobutilities:fire', function(identifier, job, token)
     local src = source
     local xBoss = ESX.GetPlayerFromId(src)
-    if not xBoss or Tokens[src] ~= token then return end
+    if not xBoss then return end
+    if not ensureValidToken(src, token) then return end
     local j = tostring(job or '')
     if not isBossAllowed(xBoss, j) then return end
     local target = nil
@@ -187,19 +303,23 @@ AddEventHandler('lizz_jobutilities:fire', function(identifier, job, token)
         end
     end
     if not target then return end
+    local targetName = target.getName and target.getName() or 'ไม่ทราบชื่อ'
     local sackJob = (Config.Position and Config.Position[j] and Config.Position[j].sack) or 'unemployed'
     target.setJob(sackJob, 0)
+    sendApexNotify(src, 'warning', ('%s | ไล่ออก'):format(targetName))
     local cfg = Config.Position and Config.Position[j]
     if cfg and cfg.welfare and cfg.welfare.sack and cfg.welfare.sack.item and cfg.welfare.sack.count then
         target.addInventoryItem(cfg.welfare.sack.item, cfg.welfare.sack.count)
     end
+    broadcastJobDataToJob(j)
 end)
 
 RegisterNetEvent('lizz_jobutilities:setrank')
 AddEventHandler('lizz_jobutilities:setrank', function(identifier, job, rank, token)
     local src = source
     local xBoss = ESX.GetPlayerFromId(src)
-    if not xBoss or Tokens[src] ~= token then return end
+    if not xBoss then return end
+    if not ensureValidToken(src, token) then return end
     local j = tostring(job or '')
     if not isBossAllowed(xBoss, j) then return end
     local r = tonumber(rank) or 0
@@ -212,18 +332,37 @@ AddEventHandler('lizz_jobutilities:setrank', function(identifier, job, rank, tok
         end
     end
     if not target then return end
+
+    local targetName = target.getName and target.getName() or 'ไม่ทราบชื่อ'
+    local oldRank = tonumber(target.job and target.job.grade) or 0
     target.setJob(j, r)
+
+    getGradeLabel(j, r, function(newGradeLabel)
+        if r > oldRank then
+            sendApexNotify(src, 'success', ('%s | เลื่อนขั้น | %s'):format(targetName, newGradeLabel))
+        elseif r < oldRank then
+            sendApexNotify(src, 'warning', ('%s | ลดขั้น | %s'):format(targetName, newGradeLabel))
+        else
+            sendApexNotify(src, 'success', ('%s | ปรับขั้น | %s'):format(targetName, newGradeLabel))
+        end
+    end)
+
+    broadcastJobDataToJob(j)
 end)
 
 RegisterNetEvent('lizz_jobutilities:givebonus')
 AddEventHandler('lizz_jobutilities:givebonus', function(identifier, amount, job, token)
     local src = source
     local xBoss = ESX.GetPlayerFromId(src)
-    if not xBoss or Tokens[src] ~= token then return end
+    if not xBoss then return end
+    if not ensureValidToken(src, token) then return end
     local j = tostring(job or '')
     if not isBossAllowed(xBoss, j) then return end
-    local amt = tonumber(amount) or 0
-    if amt <= 0 then return end
+    local amt = parsePositiveAmount(amount)
+    if not amt then
+        sendApexNotify(src, "error", "จำนวนเงินไม่ถูกต้อง")
+        return
+    end
     getSocietyAccount(j, function(acc)
         if not acc or acc.money < amt then return end
         local target = nil
@@ -237,6 +376,8 @@ AddEventHandler('lizz_jobutilities:givebonus', function(identifier, amount, job,
         if not target then return end
         acc.removeMoney(amt)
         target.addAccountMoney('bank', amt)
+        LastFundByJob[j] = tonumber(acc.money) or 0
         broadcastFundToJob(j, acc.money)
+        broadcastJobDataToJob(j)
     end)
 end)
