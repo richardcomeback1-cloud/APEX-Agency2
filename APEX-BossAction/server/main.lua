@@ -163,7 +163,7 @@ AddEventHandler('lizz_jobutilities:deposit', function(job, amount, token)
     if not xPlayer or Tokens[src] ~= token then return end
     local j = tostring(job or '')
     if not isBossAllowed(xPlayer, j) then return end
-    local amt = tonumber(amount) or 0
+    local amt = math.floor(tonumber(amount) or 0)
     if amt <= 0 then return end
     if xPlayer.getMoney() < amt then return end
     getSocietyAccount(j, function(acc)
@@ -181,7 +181,7 @@ AddEventHandler('lizz_jobutilities:withdraw', function(job, amount, token)
     if not xPlayer or Tokens[src] ~= token then return end
     local j = tostring(job or '')
     if not isBossAllowed(xPlayer, j) then return end
-    local amt = tonumber(amount) or 0
+    local amt = math.floor(tonumber(amount) or 0)
     if amt <= 0 then return end
     getSocietyAccount(j, function(acc)
         if not acc or acc.money < amt then return end
@@ -283,7 +283,7 @@ AddEventHandler('lizz_jobutilities:givebonus', function(identifier, amount, job,
     if not xBoss or Tokens[src] ~= token then return end
     local j = tostring(job or '')
     if not isBossAllowed(xBoss, j) then return end
-    local amt = tonumber(amount) or 0
+    local amt = math.floor(tonumber(amount) or 0)
     if amt <= 0 then return end
     getSocietyAccount(j, function(acc)
         if not acc or acc.money < amt then return end

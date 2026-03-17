@@ -1204,6 +1204,50 @@ input[name=dialog-search]::placeholder {
     /* box-shadow: inset 0 0 0 0.1vh rgba(106, 207, 255, 0.22); */
 }
 
+.box-main .container.apex-modern #fund.fund-raise {
+    animation: fundRaise .55s ease;
+}
+
+.box-main .container.apex-modern #fund.fund-drop {
+    animation: fundDrop .55s ease;
+}
+
+@keyframes fundRaise {
+    0% { transform: translateY(0); color: #fff; }
+    50% { transform: translateY(-0.25vh); color: #7ef9be; text-shadow: 0 0 .9vh rgba(126, 249, 190, 0.45); }
+    100% { transform: translateY(0); color: #fff; }
+}
+
+@keyframes fundDrop {
+    0% { transform: translateY(0); color: #fff; }
+    50% { transform: translateY(0.25vh); color: #ff8f8f; text-shadow: 0 0 .9vh rgba(255, 143, 143, 0.4); }
+    100% { transform: translateY(0); color: #fff; }
+}
+
+.box-main .container.apex-modern #fund-delta {
+    position: absolute;
+    top: 6.5vh;
+    left: 1.7vh;
+    font-size: 1.08vh;
+    letter-spacing: 0.03vh;
+    opacity: 0;
+    transform: translateY(0.35vh);
+    transition: all .22s ease;
+}
+
+.box-main .container.apex-modern #fund-delta.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.box-main .container.apex-modern #fund-delta.up {
+    color: #7ef9be;
+}
+
+.box-main .container.apex-modern #fund-delta.down {
+    color: #ff8f8f;
+}
+
 .box-main .container.apex-modern #fund-live {
     top: 1.05vh;
     right: 1.2vh;

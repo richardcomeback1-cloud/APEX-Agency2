@@ -1,4 +1,7 @@
+let lastFundValue = null;
+
 $(document).ready(function () {
+
     window.addEventListener('message', function (event) {
         var data = event.data
         if (data.type == "main") {
@@ -22,6 +25,7 @@ $(document).ready(function () {
                         <span id="header-fund">ทรัพย์สินหน่วยงาน</span>
                         <span id="fund-live" class="live-dot"><iconify-icon icon="line-md:loading-twotone-loop"></iconify-icon> อัพเดทตลอด</span>
                         <span id="fund">$${ App.format_number(data.fund) }</span>
+                        <span id="fund-delta" class="fund-delta"></span>
                         <div class="fund-action-row">
                             <input type="number" name="dialog-count" id="dialog-fund" placeholder="กรอกจำนวนเงิน" pattern="^[0-9]" oninput="validity.valid||(value='');" min="1"> 
                             <div class="btn-deposit action-btn"><iconify-icon icon="line-md:plus"></iconify-icon><span>ฝากเงิน</span></div>
@@ -56,26 +60,31 @@ $(document).ready(function () {
             $(".btn-deposit").click(function() {
                 App.sounds("button_click");
                 if ( $("#dialog-fund").val() > 0 ) {
+                    const amount = Math.max(0, parseInt($("#dialog-fund").val(), 10) || 0);
+                    if (amount <= 0) return;
                     $.post(`https://${GetParentResourceName()}/deposit`, JSON.stringify({
                         job: data.title,
-                        amount: $("#dialog-fund").val(),
+                        amount: amount,
                     }));
-                    $("#dialog-fund").val(undefined);
+                    $("#dialog-fund").val('');
                 }
             });
         
             $(".btn-withdraw").click(function() {
                 App.sounds("button_click");
                 if ( $("#dialog-fund").val() > 0 ) {
+                    const amount = Math.max(0, parseInt($("#dialog-fund").val(), 10) || 0);
+                    if (amount <= 0) return;
                     $.post(`https://${GetParentResourceName()}/withdraw`, JSON.stringify({
                         job: data.title,
-                        amount: $("#dialog-fund").val(),
+                        amount: amount,
                     }));
-                    $("#dialog-fund").val(undefined); // ล้างช่องกรอก
+                    $("#dialog-fund").val(''); // ล้างช่องกรอก
                 }
             });
 
             App.update_agency(data.title , data.agency)
+            App.updateFundDisplay(data.fund || 0, true)
 
             $("#dialog-search").keyup(function() {  
                 var str = $("#dialog-search").val().toLowerCase();
@@ -94,7 +103,7 @@ $(document).ready(function () {
         
         }
         if (data.type === "update_fund") {
-            $("#fund").html(`$${ App.format_number(data.fund || 0) }`);
+            App.updateFundDisplay(data.fund || 0, false);
         }
         if (data.type === "update_agency") {
             if (Array.isArray(data.grade)) {
@@ -116,6 +125,38 @@ $(document).ready(function () {
 
 const App = {
     selected_rank: null,
+
+    updateFundDisplay : function(nextFund, isInitial) {
+        const numericFund = Math.max(0, parseInt(nextFund, 10) || 0);
+        $("#fund").html(`$${ App.format_number(numericFund) }`);
+
+        if (isInitial || lastFundValue === null) {
+            lastFundValue = numericFund;
+            $("#fund").removeClass('fund-raise fund-drop');
+            $("#fund-delta").removeClass('show up down').text('');
+            return;
+        }
+
+        const delta = numericFund - lastFundValue;
+        lastFundValue = numericFund;
+
+        $("#fund").removeClass('fund-raise fund-drop');
+        if (delta > 0) {
+            $("#fund").addClass('fund-raise');
+            $("#fund-delta").removeClass('down').addClass('show up').text(`+${App.format_number(delta)}`);
+        } else if (delta < 0) {
+            const absDelta = Math.abs(delta);
+            $("#fund").addClass('fund-drop');
+            $("#fund-delta").removeClass('up').addClass('show down').text(`-${App.format_number(absDelta)}`);
+        } else {
+            $("#fund-delta").removeClass('show up down').text('');
+        }
+
+        setTimeout(function() {
+            $("#fund").removeClass('fund-raise fund-drop');
+            $("#fund-delta").removeClass('show up down').text('');
+        }, 1000);
+    },
     
 	update_agency : function(job , agency) {
         $(".player-list").html("");
@@ -398,9 +439,11 @@ const App = {
                 $(".container-dialog").fadeOut();
                 $(`.container`).removeClass('blur');
 
+                const amount = Math.max(0, parseInt($("#dialog-count-bonus").val(), 10) || 0);
+                if (amount <= 0) return;
                 $.post(`https://${GetParentResourceName()}/givebonus`, JSON.stringify({
                         identifier: identifier,
-                        amount: $("#dialog-count-bonus").val(),
+                        amount: amount,
                         job: job
                 }), function(cb) {
                     if (cb) {
