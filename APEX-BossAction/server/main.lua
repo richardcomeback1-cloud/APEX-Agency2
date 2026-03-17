@@ -122,6 +122,38 @@ local function parsePositiveAmount(raw)
     return value
 end
 
+local LastFundByJob = {}
+
+local function refreshFundSnapshot(job)
+    local j = tostring(job or '')
+    if j == '' then return end
+
+    getSocietyAccount(j, function(acc)
+        if not acc then return end
+        local money = tonumber(acc.money) or 0
+        if LastFundByJob[j] == nil then
+            LastFundByJob[j] = money
+            return
+        end
+
+        if LastFundByJob[j] ~= money then
+            LastFundByJob[j] = money
+            broadcastFundToJob(j, money)
+            broadcastJobDataToJob(j)
+        end
+    end)
+end
+
+CreateThread(function()
+    while true do
+        local jobs = Config and Config.Position or {}
+        for jobName, _ in pairs(jobs) do
+            refreshFundSnapshot(jobName)
+        end
+        Wait(1000)
+    end
+end)
+
 local function handleGenerateToken(src)
     local token = tostring(math.random(100000, 999999)) .. '-' .. tostring(os.time())
     Tokens[src] = token
@@ -203,6 +235,7 @@ AddEventHandler('lizz_jobutilities:deposit', function(job, amount, token)
         if not acc then return end
         xPlayer.removeMoney(amt)
         acc.addMoney(amt)
+        LastFundByJob[j] = tonumber(acc.money) or 0
         broadcastFundToJob(j, acc.money)
     end)
 end)
@@ -224,6 +257,7 @@ AddEventHandler('lizz_jobutilities:withdraw', function(job, amount, token)
         if not acc or acc.money < amt then return end
         acc.removeMoney(amt)
         xPlayer.addMoney(amt)
+        LastFundByJob[j] = tonumber(acc.money) or 0
         broadcastFundToJob(j, acc.money)
     end)
 end)
@@ -342,6 +376,7 @@ AddEventHandler('lizz_jobutilities:givebonus', function(identifier, amount, job,
         if not target then return end
         acc.removeMoney(amt)
         target.addAccountMoney('bank', amt)
+        LastFundByJob[j] = tonumber(acc.money) or 0
         broadcastFundToJob(j, acc.money)
         broadcastJobDataToJob(j)
     end)
