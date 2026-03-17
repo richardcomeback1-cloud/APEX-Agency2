@@ -1,0 +1,331 @@
+@font-face {
+    font-family: Kanit;
+    src: url("./Kanit.ttf");
+}
+
+* {
+    padding: 0px;
+    margin: 0px;
+    box-sizing: border-box;
+    font-family: Kanit;
+}
+ 
+:root {
+ 
+ 
+ 
+    --header-bg: #0F0F18;
+    --font-color: white;
+    --menu-bg: rgba(255, 255, 255, 0.1);
+    --header-bg-try: #0f0f18cf;
+    --color-base: rgb(103, 177, 186);
+    --color-box-time: #67b1ba33;
+    --color-border-time: #888888;
+    --font-color-try: #DADADA;
+    --color-border-base: rgb(103 177 186 / 26%);
+    --color-box-item: #1b1b2ba6;
+    --color-border-base-try: #8888887d;
+ 
+}
+
+ul {
+    list-style: none;
+    line-height: 25px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    flex-direction: column;
+}
+
+body {
+    width: 100vw;
+    height: 100vh;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    overflow: hidden;
+    background: gray;
+}
+
+.container-fluid {
+    position: absolute;
+    display: flex;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(1.0);
+    align-items: center;
+    justify-content: center;
+}
+
+
+.box-center-bill {
+    display: flex;
+    width: 48vh;
+    height: 60vh;
+    position: relative;
+    align-items: center;
+    padding: 2vh;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: auto;
+    justify-content: center;
+    background-image: url(./img/base.png);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+}
+
+.btns-bill {
+    width: 85%;
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    bottom: 1.7vh;
+}
+
+.title {
+    width: 86%;
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* center content horizontally */
+    top: 1.5vh;
+    color: var(--color-main3);
+    font-size: 2vh;
+    text-transform: uppercase;
+    letter-spacing: 0.2vh;
+    pointer-events: none;
+    /* prevent click overlap */
+}
+
+.title-text {
+    pointer-events: auto;
+    z-index: 1;
+    color: var(--font-color);
+}
+
+.close {
+    position: absolute;
+    right: 2vh;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 2;
+    color: rgb(241, 82, 82);
+    transition: 0.1s ease;
+}
+
+.close:hover {
+    transform: scale(1.1);
+}
+
+.data-center-bill {
+    display: flex;
+    background-color: var(--color-box-item);
+    width: 100%;
+    height: 88%;
+    /* border-radius: 1vh; */
+    align-items: center;
+    justify-content: center;
+    padding: 0.5vh;
+    position: relative;
+    top: 0vh;
+    overflow-y: scroll;
+    border: 0.1vh solid var(--color-border-base-try);
+    border-radius: 0.5vh;
+}
+
+.data-center-bill::-webkit-scrollbar {
+    width: 3px;
+}
+
+.data-center-bill::-webkit-scrollbar-track {
+    border-radius: 5px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.data-center-bill::-webkit-scrollbar-thumb {
+    background: #00a5c8;
+    border-radius: 5px;
+}
+
+tr th {
+    background: var(--color-box-time);
+    color: white;
+}
+
+.tables-bill {
+    border-collapse: collapse;
+}
+
+.tables-bill th,
+.tables-bill td {
+    border: none;
+    padding: 0.2vh 0.5vh;
+}
+
+.tables-bill th.first-col {
+    /* border-top-left-radius: 0.5vh; */
+    /* border-bottom-left-radius: 0.5vh; */
+}
+
+.tables-bill th.last-col {
+    /* border-top-right-radius: 0.5vh; */
+    /* border-bottom-right-radius: 0.5vh; */
+}
+
+.tables-bill thead {
+    border-bottom: 2px solid transparent;
+    padding-bottom: 10px;
+}
+
+.tables-bill tbody tr:first-child {
+    padding-top: 10px;
+}
+
+.btn-bill,
+.btn-history {
+    border-radius: 0.5vh;
+    color: var(--font-color);
+    padding: 0.5vh 1vh;
+    transition: all 0.3s ease;
+    font-size: 1.3vh;
+    cursor: pointer;
+    background: var(--menu-bg);
+    border: 0.2vh solid var(--color-border-time);
+}
+
+.btn-bill,
+.btn-history {
+    margin-left: 1vh;
+}
+
+.btn-bill:hover,
+.btn-history:hover {
+    background: var(--color-base); 
+}
+
+ 
+
+.listbill,
+.listhistory {
+    display: flex;
+    gap: 1vh;
+    width: 100%;
+    padding: 1vh;
+    top: 0.2vh;
+    position: absolute;
+}
+
+.data-center-bill thead {
+    position: sticky;
+    top: -10px;
+    color: white;
+    z-index: 1;
+}
+
+tbody,
+td,
+th,
+thead,
+tr {
+    border-color: inherit;
+    border-style: solid;
+    border-width: 0;
+    padding: 5px;
+}
+
+.tables-bill {
+    width: 100%;
+}
+
+tbody,
+td,
+tfoot,
+th,
+thead,
+tr {
+    border-style: solid;
+    border-width: 0;
+    position: relative;
+    font-size: 1.3vh;
+}
+
+.tables-bill tbody tr:nth-child(odd) td {
+    background-color: var(--color-box-time);
+}
+
+.tables-bill tbody tr:nth-child(odd) td:first-child {
+    /* border-top-left-radius: 0.5vh; */
+    /* border-bottom-left-radius: 0.5vh; */
+}
+
+.tables-bill tbody tr:nth-child(odd) td:last-child {
+    /* border-top-right-radius: 0.5vh; */
+    /* border-bottom-right-radius: 0.5vh; */
+}
+
+.tables-bill tbody tr:nth-child(even) td {
+    background-color: var(--color-box-time);
+}
+
+.tables-bill tbody tr:nth-child(even) td:first-child {
+}
+
+.tables-bill tbody tr:nth-child(even) td:last-child {
+    /* border-top-right-radius: 0.5vh; */
+    /* border-bottom-right-radius: 0.5vh; */
+}
+
+.tables-bill tbody tr {
+    color: white; 
+    transition: all 0.3s ease;
+}
+
+.tables-bill tbody tr:hover {
+    background-color: transparent;
+}
+
+.tables-bill {
+    width: 100%;
+    border-spacing: 0 0.5vh;
+    border-collapse: separate;
+}
+
+.Bill-acion-icon {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    filter: brightness(0) invert(0.9);
+    width: 3vh;
+}
+
+.Bill-acion-icon:hover {
+    transform: scale(0.8);
+}
+
+.custom-tooltip {
+    position: relative;
+    cursor: pointer;
+}
+
+.custom-tooltip:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: var(--color-black-translucent);
+    color: #fff;
+    padding: 0.5vh 1vh;
+    border-radius: 0.5vh;
+    white-space: nowrap;
+    z-index: 10;
+    margin-top: 1vh;
+    font-size: 1.2vh;
+    box-shadow: 0 0.2vh 0.6vh var(--color-black-translucent);
+}
