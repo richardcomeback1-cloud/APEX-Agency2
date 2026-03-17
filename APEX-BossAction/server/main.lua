@@ -129,6 +129,17 @@ local function handleGenerateToken(src)
     TriggerClientEvent('APEX-BossAction:gen-token', src, token)
 end
 
+local function ensureValidToken(src, token)
+    if not src then return false end
+    if Tokens[src] and Tokens[src] == token then
+        return true
+    end
+
+    handleGenerateToken(src)
+    sendApexNotify(src, 'warning', 'กำลังซิงก์ข้อมูล กรุณาลองอีกครั้ง')
+    return false
+end
+
 RegisterNetEvent('lizz_boss-action:gen-token')
 AddEventHandler('lizz_boss-action:gen-token', function()
     handleGenerateToken(source)
@@ -142,6 +153,7 @@ end)
 local function handleGetBossData(src, job)
     local xPlayer = ESX.GetPlayerFromId(src)
     if not xPlayer then return end
+    handleGenerateToken(src)
     local j = tostring(job or '')
     getSocietyAccount(j, function(acc)
         local fund = acc and acc.money or 0
@@ -177,7 +189,8 @@ RegisterNetEvent('lizz_jobutilities:deposit')
 AddEventHandler('lizz_jobutilities:deposit', function(job, amount, token)
     local src = source
     local xPlayer = ESX.GetPlayerFromId(src)
-    if not xPlayer or Tokens[src] ~= token then return end
+    if not xPlayer then return end
+    if not ensureValidToken(src, token) then return end
     local j = tostring(job or '')
     if not isBossAllowed(xPlayer, j) then return end
     local amt = parsePositiveAmount(amount)
@@ -198,7 +211,8 @@ RegisterNetEvent('lizz_jobutilities:withdraw')
 AddEventHandler('lizz_jobutilities:withdraw', function(job, amount, token)
     local src = source
     local xPlayer = ESX.GetPlayerFromId(src)
-    if not xPlayer or Tokens[src] ~= token then return end
+    if not xPlayer then return end
+    if not ensureValidToken(src, token) then return end
     local j = tostring(job or '')
     if not isBossAllowed(xPlayer, j) then return end
     local amt = parsePositiveAmount(amount)
@@ -218,7 +232,8 @@ RegisterNetEvent('lizz_jobutilities:hire')
 AddEventHandler('lizz_jobutilities:hire', function(targetId, job, token)
     local src = source
     local xBoss = ESX.GetPlayerFromId(src)
-    if not xBoss or Tokens[src] ~= token then return end
+    if not xBoss then return end
+    if not ensureValidToken(src, token) then return end
     local j = tostring(job or '')
     if not isBossAllowed(xBoss, j) then return end
     local tId = tonumber(targetId)
@@ -241,7 +256,8 @@ RegisterNetEvent('lizz_jobutilities:fire')
 AddEventHandler('lizz_jobutilities:fire', function(identifier, job, token)
     local src = source
     local xBoss = ESX.GetPlayerFromId(src)
-    if not xBoss or Tokens[src] ~= token then return end
+    if not xBoss then return end
+    if not ensureValidToken(src, token) then return end
     local j = tostring(job or '')
     if not isBossAllowed(xBoss, j) then return end
     local target = nil
@@ -268,7 +284,8 @@ RegisterNetEvent('lizz_jobutilities:setrank')
 AddEventHandler('lizz_jobutilities:setrank', function(identifier, job, rank, token)
     local src = source
     local xBoss = ESX.GetPlayerFromId(src)
-    if not xBoss or Tokens[src] ~= token then return end
+    if not xBoss then return end
+    if not ensureValidToken(src, token) then return end
     local j = tostring(job or '')
     if not isBossAllowed(xBoss, j) then return end
     local r = tonumber(rank) or 0
@@ -303,7 +320,8 @@ RegisterNetEvent('lizz_jobutilities:givebonus')
 AddEventHandler('lizz_jobutilities:givebonus', function(identifier, amount, job, token)
     local src = source
     local xBoss = ESX.GetPlayerFromId(src)
-    if not xBoss or Tokens[src] ~= token then return end
+    if not xBoss then return end
+    if not ensureValidToken(src, token) then return end
     local j = tostring(job or '')
     if not isBossAllowed(xBoss, j) then return end
     local amt = parsePositiveAmount(amount)
