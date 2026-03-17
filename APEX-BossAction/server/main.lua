@@ -105,21 +105,19 @@ local function broadcastJobDataToJob(job)
 end
 
 
-local MAX_TRANSACTION_AMOUNT = 2000000000
-
 local function parsePositiveAmount(raw)
     local digits = tostring(raw or ''):gsub('%D', '')
     digits = digits:gsub('^0+', '')
     if digits == '' then return nil end
 
-    -- guard very large numbers before tonumber (Lua number precision/overflow)
-    if #digits > 10 then return nil end
+    -- Keep in safe integer range for JS/Lua interoperability
+    if #digits > 15 then return nil end
 
     local value = tonumber(digits)
     if not value then return nil end
 
     value = math.floor(value)
-    if value <= 0 or value > MAX_TRANSACTION_AMOUNT then return nil end
+    if value <= 0 then return nil end
 
     return value
 end

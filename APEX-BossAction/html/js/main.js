@@ -65,11 +65,11 @@ $(document).ready(function () {
                 App.submitFundAction('withdraw', data.title);
             });
 
-            App.isFundComposing = false;
-            App.pendingFundAction = null;
+            App.currentJob = data.title;
+            App.fundInputValue = "";
             App.update_agency(data.title , data.agency)
             App.updateFundDisplay(data.fund || 0, true)
-            App.bindNumericInput("#dialog-fund")
+            App.bindNumericInput("#dialog-fund", true)
 
             $("#dialog-search").keyup(function() {  
                 var str = $("#dialog-search").val().toLowerCase();
@@ -110,28 +110,23 @@ $(document).ready(function () {
 
 const App = {
     selected_rank: null,
-    isFundComposing: false,
-    pendingFundAction: null,
+    currentJob: null,
+    fundInputValue: "",
 
     submitFundAction : function(action, job) {
         App.sounds("button_click");
 
+        const sendJob = job || App.currentJob;
+        const amount = App.parseAmountInput(App.fundInputValue);
+
         const input = document.getElementById('dialog-fund');
-        if (!input) return;
+        if (input) input.value = '';
+        App.fundInputValue = '';
 
-        if (App.isFundComposing) {
-            App.pendingFundAction = { action: action, job: job };
-            return;
-        }
-
-        const rawAmount = String(input.value || '');
-        const amount = App.parseAmountInput(rawAmount);
-        input.value = '';
-
-        if (amount === null) return;
+        if (!sendJob || amount === null) return;
 
         $.post(`https://${GetParentResourceName()}/${action}`, JSON.stringify({
-            job: job,
+            job: sendJob,
             amount: amount,
         }));
     },
@@ -169,7 +164,7 @@ const App = {
         }, 1000);
     },
 
-    bindNumericInput : function(selector) {
+    bindNumericInput : function(selector, isFundInput) {
         const el = $(selector);
         if (!el.length) return;
 
@@ -177,24 +172,13 @@ const App = {
         el.on('input.apexNumeric change.apexNumeric keyup.apexNumeric paste.apexNumeric', function() {
             const clean = String($(this).val() || '').replace(/\D/g, '');
             $(this).val(clean);
+            if (isFundInput) {
+                App.fundInputValue = clean;
+            }
         });
 
-        if (selector === '#dialog-fund') {
-            el.on('compositionstart.apexNumeric', function() {
-                App.isFundComposing = true;
-            });
-
-            el.on('compositionend.apexNumeric', function() {
-                App.isFundComposing = false;
-                const clean = String($(this).val() || '').replace(/\D/g, '');
-                $(this).val(clean);
-
-                if (App.pendingFundAction) {
-                    const pending = App.pendingFundAction;
-                    App.pendingFundAction = null;
-                    App.submitFundAction(pending.action, pending.job);
-                }
-            });
+        if (isFundInput) {
+            App.fundInputValue = String(el.val() || '').replace(/\D/g, '');
         }
     },
 
