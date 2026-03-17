@@ -83,7 +83,7 @@ AddEventHandler('APEX-BossAction:receive-grade_info', function(data)
 end)
 
 local function syncFundToUi(newFund)
-    table_fund = tonumber(newFund) or 0
+    table_fund = newFund or 0
     SendNUIMessage({
         type = "update_fund",
         fund = table_fund
@@ -106,7 +106,7 @@ AddEventHandler('APEX-BossAction:update-job-data', function(payload)
 
     table_jobs[payload.job] = payload.agency or {}
     grade_info[payload.job] = payload.grade or {}
-    table_fund = tonumber(payload.fund) or table_fund
+    table_fund = payload.fund or table_fund
 
     if bossUIOpen and currentBossJob == payload.job then
         SendNUIMessage({
