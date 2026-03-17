@@ -57,28 +57,12 @@ $(document).ready(function () {
                 $(`.box-main`).fadeOut();
             });
 
-            $(".btn-deposit").click(function() {
-                App.sounds("button_click");
-                const rawAmount = $("#dialog-fund").val();
-                $("#dialog-fund").val('');
-                const amount = App.parseAmountInput(rawAmount);
-                if (amount === null) return;
-                $.post(`https://${GetParentResourceName()}/deposit`, JSON.stringify({
-                    job: data.title,
-                    amount: amount,
-                }));
+            $(document).off('click.apexFund', '.btn-deposit').on('click.apexFund', '.btn-deposit', function() {
+                App.submitFundAction('deposit', data.title);
             });
-        
-            $(".btn-withdraw").click(function() {
-                App.sounds("button_click");
-                const rawAmount = $("#dialog-fund").val();
-                $("#dialog-fund").val(''); // ล้างช่องกรอก
-                const amount = App.parseAmountInput(rawAmount);
-                if (amount === null) return;
-                $.post(`https://${GetParentResourceName()}/withdraw`, JSON.stringify({
-                    job: data.title,
-                    amount: amount,
-                }));
+
+            $(document).off('click.apexFund', '.btn-withdraw').on('click.apexFund', '.btn-withdraw', function() {
+                App.submitFundAction('withdraw', data.title);
             });
 
             App.update_agency(data.title , data.agency)
@@ -124,6 +108,31 @@ $(document).ready(function () {
 
 const App = {
     selected_rank: null,
+    fundActionLock: false,
+
+    submitFundAction : function(action, job) {
+        if (App.fundActionLock) return;
+        App.fundActionLock = true;
+
+        App.sounds("button_click");
+
+        const input = document.getElementById('dialog-fund');
+        const rawAmount = input ? input.value : '';
+        if (input) input.value = '';
+
+        const amount = App.parseAmountInput(rawAmount);
+        if (amount === null) {
+            setTimeout(function(){ App.fundActionLock = false; }, 120);
+            return;
+        }
+
+        $.post(`https://${GetParentResourceName()}/${action}`, JSON.stringify({
+            job: job,
+            amount: amount,
+        }));
+
+        setTimeout(function(){ App.fundActionLock = false; }, 180);
+    },
 
     updateFundDisplay : function(nextFund, isInitial) {
         const displayText = App.formatMoney(nextFund);
