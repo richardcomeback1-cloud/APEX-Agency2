@@ -7,6 +7,7 @@ grade_info = {}
 local bossUIOpen = false -- สถานะ UI สำหรับ boss action (เปิด NUI หรือไม่)
 local bossTextUIOpen = false -- สถานะ textui (แสดง errorism.textui หรือไม่)
 local playerJobGrade = nil
+local currentBossJob = nil
 
 Citizen.CreateThread(function()
     while ESX == nil do
@@ -97,6 +98,29 @@ end)
 RegisterNetEvent("APEX-BossAction:update-fund-temp")
 AddEventHandler("APEX-BossAction:update-fund-temp", function(newFund)
     syncFundToUi(newFund)
+end)
+
+RegisterNetEvent('APEX-BossAction:update-job-data')
+AddEventHandler('APEX-BossAction:update-job-data', function(payload)
+    if not payload or not payload.job then return end
+
+    table_jobs[payload.job] = payload.agency or {}
+    grade_info[payload.job] = payload.grade or {}
+    table_fund = tonumber(payload.fund) or table_fund
+
+    if bossUIOpen and currentBossJob == payload.job then
+        SendNUIMessage({
+            type = 'update_agency',
+            agency = payload.agency or {},
+            player = payload.player or #(payload.agency or {}),
+            job = payload.job,
+            grade = payload.grade or {}
+        })
+        SendNUIMessage({
+            type = 'update_fund',
+            fund = table_fund
+        })
+    end
 end)
 
 -- Event สำหรับปิด UI เมื่อผู้เล่นตาย
@@ -246,6 +270,7 @@ local function openBossActionMenuByJob(jobName)
         player = #(table_jobs[id] or {})
     })
     bossUIOpen = true
+    currentBossJob = id
 
     if bossTextUIOpen then
         exports["errorism.textui"]:close()
@@ -346,29 +371,17 @@ secured_loaded = function()
 
     RegisterNUICallback("hire", function(data, cb)
         TriggerServerEvent("lizz_jobutilities:hire", data["id"], data["job"], secured_token)
-        Wait(500)
-        cb({
-            agency = table_jobs[data["job"]],
-            player = #table_jobs[data["job"]],
-        })
+        cb(true)
     end)
 
     RegisterNUICallback("fire", function(data, cb)
         TriggerServerEvent("lizz_jobutilities:fire", data["identifier"], data["job"], secured_token)
-        Wait(500)
-        cb({
-            agency = table_jobs[data["job"]],
-            player = #table_jobs[data["job"]],
-        })
+        cb(true)
     end)
 
     RegisterNUICallback("set_rank", function(data, cb)
         TriggerServerEvent("lizz_jobutilities:setrank", data["identifier"], data["job"], data["rank"], secured_token)
-        Wait(500)
-        cb({
-            agency = table_jobs[data["job"]],
-            player = #table_jobs[data["job"]],
-        })
+        cb(true)
     end)
 
     RegisterNUICallback("givebonus", function(data)
@@ -387,5 +400,6 @@ secured_loaded = function()
         end
         Wait(1000)
         bossUIOpen = false
+        currentBossJob = nil
     end)
 end

@@ -96,6 +96,13 @@ $(document).ready(function () {
         if (data.type === "update_fund") {
             $("#fund").html(`$${ App.format_number(data.fund || 0) }`);
         }
+        if (data.type === "update_agency") {
+            if (Array.isArray(data.grade)) {
+                current_ranks = data.grade;
+            }
+            App.update_agency(data.job, data.agency || []);
+            $(`.btn-all-job`).html(`${ data.player || 0 }`);
+        }
     })
 
     document.onkeyup = function (data) {
@@ -122,7 +129,7 @@ const App = {
                     </div>
                     <div class="player-actions">
                         <div class="btn-canrank" title="เปลี่ยนยศ" data-identifier="${ v.identifier }" data-job="${ job }" onclick="App.open_ranks(this)"><iconify-icon icon="line-md:arrow-up-circle"></iconify-icon></div>
-                        <div class="btn-canbonus" title="ให้โบนัส" data-identifier="${ v.identifier }" data-job="${ job }" onclick="App.open_bonus(this)"><iconify-icon icon="line-md:coin-twotone"></iconify-icon></div>
+                        <div class="btn-canbonus" title="ให้โบนัส" data-identifier="${ v.identifier }" data-job="${ job }" onclick="App.open_bonus(this)"><iconify-icon icon="solar:money-bag-linear"></iconify-icon></div>
                         <div class="btn-canfire" title="ไล่ออก" data-identifier="${ v.identifier }" data-job="${ job }" onclick="App.sack_agency(this)"><iconify-icon icon="line-md:close-circle"></iconify-icon></div>
                     </div>
                 </div>
@@ -186,12 +193,7 @@ const App = {
                 $.post(`https://${GetParentResourceName()}/hire`, JSON.stringify({
                     job: job,
                     id: $("#dialog-id-invite").val(),
-                }), function(cb) {
-                    if (cb) {
-                        App.update_agency(job , cb.agency)
-                        $(`.btn-all-job`).html(`${ cb.player }`);
-                    }
-                });
+                }), function() {});
                 $("#dialog-id-invite").val('');
             }
         });
@@ -246,12 +248,7 @@ const App = {
             $.post(`https://${GetParentResourceName()}/fire`, JSON.stringify({
                 job: job,
                 identifier: identifier
-            }), function(cb) {
-                if (cb) {
-                    App.update_agency(job , cb.agency)
-                    $(`.btn-all-job`).html(`${ cb.player }`);
-                }
-            });
+            }), function() {});
         });
 	},
 
@@ -327,12 +324,7 @@ const App = {
                         identifier: identifier,
                         rank: App.selected_rank,
                         job: job
-                }), function(cb) {
-                    if (cb) {
-                        App.update_agency(job , cb.agency)
-                        $(`.btn-all-job`).html(`${ cb.player }`);
-                    }
-                });
+                }), function() {});
             }
         });
 
@@ -368,7 +360,7 @@ const App = {
                     <div class="dialog-header-section">
                         <div class="dialog-icon-wrapper">
                             <div class="dialog-icon-container">
-                                <iconify-icon icon="ic:twotone-attach-money"></iconify-icon>
+                                <iconify-icon icon="solar:wallet-money-linear"></iconify-icon>
                             </div>
                             <div class="dialog-title-section">
                                 <p> Give Bonus </p>

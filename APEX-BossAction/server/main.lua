@@ -66,6 +66,44 @@ local function broadcastFundToJob(job, fund)
     end
 end
 
+local function sendApexNotify(target, notifyType, text)
+    TriggerClientEvent('APEX-AllNotify:AddNotify', target, {
+        type = notifyType or 'success',
+        text = text,
+        time = 6000
+    })
+end
+
+local function getGradeLabel(job, grade, cb)
+    MySQL.scalar('SELECT label FROM job_grades WHERE job_name = ? AND grade = ? LIMIT 1', { job, tonumber(grade) or 0 }, function(label)
+        cb(label or tostring(grade))
+    end)
+end
+
+local function broadcastJobDataToJob(job)
+    local j = tostring(job or '')
+    if j == '' then return end
+
+    getSocietyAccount(j, function(acc)
+        local fund = acc and acc.money or 0
+        local agency = buildAgency(j)
+        getGradeInfo(j, function(grades)
+            for _, playerId in ipairs(ESX.GetPlayers()) do
+                local xP = ESX.GetPlayerFromId(playerId)
+                if xP and xP.job and xP.job.name == j then
+                    TriggerClientEvent('APEX-BossAction:update-job-data', playerId, {
+                        job = j,
+                        fund = fund,
+                        agency = agency,
+                        player = #agency,
+                        grade = grades
+                    })
+                end
+            end
+        end)
+    end)
+end
+
 
 local function handleGenerateToken(src)
     local token = tostring(math.random(100000, 999999)) .. '-' .. tostring(os.time())
@@ -163,12 +201,17 @@ AddEventHandler('lizz_jobutilities:hire', function(targetId, job, token)
     local tId = tonumber(targetId)
     if not tId then return end
     local xTarget = ESX.GetPlayerFromId(tId)
-    if not xTarget then return end
+    if not xTarget then
+        sendApexNotify(src, 'error', 'ไม่พบไอดีที่ท่านกรอก')
+        return
+    end
     xTarget.setJob(j, 0)
+    sendApexNotify(src, 'success', ('ได้เพิ่ม %s เป็นหน่วยงานแล้ว'):format(xTarget.getName() or GetPlayerName(tId) or 'ไม่ทราบชื่อ'))
     local cfg = Config.Position and Config.Position[j]
     if cfg and cfg.welfare and cfg.welfare.hire and cfg.welfare.hire.item and cfg.welfare.hire.count then
         xTarget.addInventoryItem(cfg.welfare.hire.item, cfg.welfare.hire.count)
     end
+    broadcastJobDataToJob(j)
 end)
 
 RegisterNetEvent('lizz_jobutilities:fire')
@@ -187,12 +230,15 @@ AddEventHandler('lizz_jobutilities:fire', function(identifier, job, token)
         end
     end
     if not target then return end
+    local targetName = target.getName and target.getName() or 'ไม่ทราบชื่อ'
     local sackJob = (Config.Position and Config.Position[j] and Config.Position[j].sack) or 'unemployed'
     target.setJob(sackJob, 0)
+    sendApexNotify(src, 'warning', ('%s | ไล่ออก'):format(targetName))
     local cfg = Config.Position and Config.Position[j]
     if cfg and cfg.welfare and cfg.welfare.sack and cfg.welfare.sack.item and cfg.welfare.sack.count then
         target.addInventoryItem(cfg.welfare.sack.item, cfg.welfare.sack.count)
     end
+    broadcastJobDataToJob(j)
 end)
 
 RegisterNetEvent('lizz_jobutilities:setrank')
@@ -212,7 +258,22 @@ AddEventHandler('lizz_jobutilities:setrank', function(identifier, job, rank, tok
         end
     end
     if not target then return end
+
+    local targetName = target.getName and target.getName() or 'ไม่ทราบชื่อ'
+    local oldRank = tonumber(target.job and target.job.grade) or 0
     target.setJob(j, r)
+
+    getGradeLabel(j, r, function(newGradeLabel)
+        if r > oldRank then
+            sendApexNotify(src, 'success', ('%s | เลื่อนขั้น | %s'):format(targetName, newGradeLabel))
+        elseif r < oldRank then
+            sendApexNotify(src, 'warning', ('%s | ลดขั้น | %s'):format(targetName, newGradeLabel))
+        else
+            sendApexNotify(src, 'success', ('%s | ปรับขั้น | %s'):format(targetName, newGradeLabel))
+        end
+    end)
+
+    broadcastJobDataToJob(j)
 end)
 
 RegisterNetEvent('lizz_jobutilities:givebonus')
@@ -238,5 +299,6 @@ AddEventHandler('lizz_jobutilities:givebonus', function(identifier, amount, job,
         acc.removeMoney(amt)
         target.addAccountMoney('bank', amt)
         broadcastFundToJob(j, acc.money)
+        broadcastJobDataToJob(j)
     end)
 end)
